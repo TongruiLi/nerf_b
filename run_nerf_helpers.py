@@ -164,7 +164,6 @@ class MLP(torch.nn.Module):
             self.fc2 = torch.nn.Linear(self.hidden_size, output_size)
             self.sigmoid = torch.nn.Sigmoid()
         def forward(self, x):
-            print("shape is ", x.shape)
             hidden = self.fc1(x)
             relu = self.relu(hidden)
             output = self.fc2(relu)
