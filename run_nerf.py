@@ -24,7 +24,7 @@ np.random.seed(0)
 DEBUG = False
 
 
-MODEL_MLP = MLP(3, 4, 3)
+MODEL_MLP = MLP(3, 64, 3)
 MODEL_MLP = MODEL_MLP.to(device)
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
