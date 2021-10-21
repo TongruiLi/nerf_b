@@ -90,7 +90,9 @@ class NeRF(nn.Module):
             self.feature_linear = nn.Linear(W, W)
             self.alpha_linear = nn.Linear(W, 1)
             self.rgb_linear = nn.Linear(W//2, 3)
+            self.v_linear = nn.Linear(W//2, 4)
         else:
+            raise NotImplementedError
             self.output_linear = nn.Linear(W, output_ch)
 
     def forward(self, x):
@@ -112,10 +114,14 @@ class NeRF(nn.Module):
                 h = F.relu(h)
 
             rgb = self.rgb_linear(h)
-            outputs = torch.cat([rgb, alpha], -1)
+            v_s = self.v_linear(h)
+            #print(v_s.shape)
+            #exit(0)
+            outputs = torch.cat([rgb, alpha, v_s], -1)
         else:
             outputs = self.output_linear(h)
-
+        # this returns c(t), sigma(t)
+        #print(outputs.shape)
         return outputs    
 
     def load_weights_from_keras(self, weights):
@@ -147,6 +153,23 @@ class NeRF(nn.Module):
         self.alpha_linear.weight.data = torch.from_numpy(np.transpose(weights[idx_alpha_linear]))
         self.alpha_linear.bias.data = torch.from_numpy(np.transpose(weights[idx_alpha_linear+1]))
 
+
+class MLP(torch.nn.Module):
+        def __init__(self, input_size, hidden_size, output_size):
+            super(MLP, self).__init__()
+            self.input_size = input_size
+            self.hidden_size  = hidden_size
+            self.fc1 = torch.nn.Linear(self.input_size, self.hidden_size)
+            self.relu = torch.nn.ReLU()
+            self.fc2 = torch.nn.Linear(self.hidden_size, output_size)
+            self.sigmoid = torch.nn.Sigmoid()
+        def forward(self, x):
+            print("shape is ", x.shape)
+            hidden = self.fc1(x)
+            relu = self.relu(hidden)
+            output = self.fc2(relu)
+            output = self.sigmoid(output)
+            return output
 
 
 # Ray helpers

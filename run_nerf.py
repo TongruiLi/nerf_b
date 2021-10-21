@@ -24,6 +24,8 @@ np.random.seed(0)
 DEBUG = False
 
 
+MODEL_MLP = MLP(3, 4, 3)
+MODEL_MLP = MODEL_MLP.to(device)
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
     """
@@ -204,6 +206,7 @@ def create_nerf(args):
                                                                 netchunk=args.netchunk)
 
     # Create optimizer
+    grad_vars += list(MODEL_MLP.parameters())
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
 
     start = 0
@@ -292,7 +295,11 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=F
 
     alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
     # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
+    #torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
+    # 1.-alpha + 1e-10] => 1-exp(-x) => alpha = exp(-sigma(t_k)*delta(t_k))
+    # 
     weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
+    #\hat{C(r)}
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
 
     depth_map = torch.sum(weights * z_vals, -1)
@@ -383,8 +390,10 @@ def render_rays(ray_batch,
 
 #     raw = run_network(pts)
     raw = network_query_fn(pts, viewdirs, network_fn)
-    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
-
+    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw[:, :, 4:], z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
+    #print(raw.shape, rgb_map.shape)
+    v_s_map, _, _, _, _ = raw2outputs(raw[:, :, :4], z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
+    rgb_map = rgb_map + MODEL_MLP.forward(v_s_map)
     if N_importance > 0:
 
         rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
